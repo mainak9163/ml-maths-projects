@@ -1,11 +1,28 @@
-import streamlit as st
-import numpy as np
+import math
+
 import matplotlib.pyplot as plt
-from scipy.stats import uniform, expon, poisson
+import numpy as np
+import streamlit as st
 
 st.set_page_config(page_title="CLT & LLN Simulator", layout="wide")
 st.title("CLT & Law of Large Numbers Simulator")
 st.markdown("**CSEL 863: Introduction to Data Science** — Sections 2–4")
+
+
+def uniform_pdf(x, a, b):
+    if b <= a:
+        return np.zeros_like(x, dtype=float)
+    return np.where((x >= a) & (x <= b), 1 / (b - a), 0.0)
+
+
+def exponential_pdf(x, rate):
+    return np.where(x >= 0, rate * np.exp(-rate * x), 0.0)
+
+
+def poisson_pmf(k, lam):
+    k = np.asarray(k, dtype=int)
+    factorials = np.array([math.factorial(int(value)) for value in k], dtype=float)
+    return np.exp(-lam) * np.power(lam, k) / factorials
 
 # Sidebar controls
 st.sidebar.header("Distribution Settings")
@@ -19,9 +36,12 @@ n = st.sidebar.select_slider("Sample Size n per simulation", options=[5, 30, 100
 
 if dist == "Uniform (Continuous)":
     a, b = st.sidebar.slider("Uniform(a, b)", 0.0, 10.0, (0.0, 1.0))
+    if b <= a:
+        st.error("For a valid uniform distribution, `b` must be greater than `a`.")
+        st.stop()
     mean_theory = (a + b) / 2
     var_theory = (b - a) ** 2 / 12
-    pdf_func = lambda x: uniform.pdf(x, loc=a, scale=b - a)
+    pdf_func = lambda x: uniform_pdf(x, a, b)
     sample_func = lambda: np.random.uniform(a, b, n)
     st.sidebar.latex(r"f(x) = \frac{1}{b-a} \quad (a \leq x \leq b)")
     st.sidebar.latex(rf"\mu = \frac{{a+b}}{2} = {mean_theory:.3f}")
@@ -30,7 +50,7 @@ elif dist == "Exponential (Continuous)":
     beta = st.sidebar.slider("Rate β (β > 0)", 0.1, 5.0, 1.0)
     mean_theory = 1 / beta
     var_theory = 1 / (beta**2)
-    pdf_func = lambda x: expon.pdf(x, scale=1 / beta)
+    pdf_func = lambda x: exponential_pdf(x, beta)
     sample_func = lambda: np.random.exponential(scale=1 / beta, size=n)
     st.sidebar.latex(r"f(x|\beta) = \beta e^{-\beta x} \quad (x > 0)")
     st.sidebar.latex(f"\\mu = \\frac{{1}}{{\\beta}} = {mean_theory:.3f}")
@@ -39,7 +59,7 @@ else:  # Poisson
     lam = st.sidebar.slider("λ (rate)", 1, 20, 5)
     mean_theory = lam
     var_theory = lam
-    pmf_func = lambda k: poisson.pmf(k, lam)
+    pmf_func = lambda k: poisson_pmf(k, lam)
     sample_func = lambda: np.random.poisson(lam, n)
     st.sidebar.latex(
         r"f(x|\lambda) = \frac{e^{-\lambda}\lambda^x}{x!} \quad x=0,1,2,\dots"
@@ -80,7 +100,8 @@ with col1:
         label=f"Theoretical mean = {mean_theory:.3f}",
     )
     ax.legend()
-    st.pyplot(fig)
+    st.pyplot(fig, use_container_width=True)
+    plt.close(fig)
 
 with col2:
     st.subheader(f"Sampling Distribution of Means (n = {n}, {n_sim} simulations)")
@@ -104,7 +125,8 @@ with col2:
     ax.set_xlabel("Sample Mean")
     ax.set_ylabel("Density")
     ax.legend()
-    st.pyplot(fig)
+    st.pyplot(fig, use_container_width=True)
+    plt.close(fig)
 
 st.success(
     f"✅ Law of Large Numbers: Sample means converge to theoretical mean **{mean_theory:.3f}**"
